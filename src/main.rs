@@ -52,8 +52,8 @@ async fn run_writer(mut accept_rx: mpsc::Receiver<TcpStream>) {
             }
             () = tokio::time::sleep_until(sleep_until.into()) => {
                 sleep_until = new_sleep_until();
+                let spit = spitter.spit(&mut rand::rng());
                 for (i, stream) in  streams.iter_mut().enumerate() {
-                    let spit = spitter.spit(&mut rand::rng());
                     let res = match tokio::time::timeout(Duration::from_secs(1), stream.write_all(spit.as_bytes())).await {
                         Ok(res) => res,
                         Err(_) => {
