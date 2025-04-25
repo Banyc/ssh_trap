@@ -83,7 +83,7 @@ fn new_sleep_until() -> Instant {
 
 fn ascii_string_list() -> Vec<String> {
     let mut list = vec![];
-    for char in ' '..'~' {
+    for char in ' '..='~' {
         list.push(char.to_string());
     }
     list.push("\r\n".to_string());
