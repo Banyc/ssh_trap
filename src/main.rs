@@ -93,13 +93,13 @@ fn ascii_string_list() -> Vec<String> {
 #[derive(Debug)]
 struct RandStringSpitter {
     spit_list: Vec<String>,
-    banned: Banned,
+    banned_strings: Vec<String>,
     prev_string: String,
 }
 impl RandStringSpitter {
     pub fn new_ssh_identifier() -> Self {
         Self {
-            banned: Banned::new(vec!["SSH-".to_string()]),
+            banned_strings: vec!["SSH-".to_string()],
             spit_list: ascii_string_list(),
             prev_string: String::new(),
         }
@@ -107,41 +107,39 @@ impl RandStringSpitter {
     pub fn spit(&mut self, rng: &mut impl Rng) -> &str {
         let spit_list = Choose::new(&self.spit_list).unwrap();
         loop {
-            let mut new_string = self.prev_string.clone();
+            let mut appended_string = self.prev_string.clone();
             let next = rng.sample(&spit_list);
-            new_string.push_str(next.as_str());
+            appended_string.push_str(next.as_str());
 
-            if self.banned.is_banned(&new_string) {
+            if ends_with_any(&appended_string, &self.banned_strings) {
                 continue;
             }
 
-            let drain = new_string.len().saturating_sub(self.banned.ctx_len());
-            new_string.drain(..drain);
-            self.prev_string = new_string;
+            let extra_prefix = appended_string
+                .len()
+                .saturating_sub(longest_len(&self.banned_strings));
+            appended_string.drain(..extra_prefix);
+            self.prev_string = appended_string;
             break next;
         }
     }
 }
 
-#[derive(Debug)]
-struct Banned {
-    list: Vec<String>,
+fn longest_len<S>(strings: &[S]) -> usize
+where
+    S: AsRef<str>,
+{
+    strings.iter().map(|s| s.as_ref().len()).max().unwrap_or(0)
 }
-impl Banned {
-    pub fn new(list: Vec<String>) -> Self {
-        Self { list }
-    }
-    pub fn ctx_len(&self) -> usize {
-        self.list.iter().map(|s| s.len()).max().unwrap_or(0)
-    }
-    pub fn is_banned(&self, s: &str) -> bool {
-        let mut is_banned = false;
-        for banned in &self.list {
-            if banned.ends_with(s) {
-                is_banned = true;
-                break;
-            }
+
+fn ends_with_any<S>(s: &str, keywords: &[S]) -> bool
+where
+    S: AsRef<str>,
+{
+    for keyword in keywords {
+        if s.ends_with(keyword.as_ref()) {
+            return true;
         }
-        is_banned
     }
+    false
 }
