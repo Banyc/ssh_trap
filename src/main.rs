@@ -44,7 +44,6 @@ async fn run_writer(mut accept_rx: mpsc::Receiver<TcpStream>) {
     let mut spitter = RandStringSpitter::new_ssh_identifier();
     let mut sleep_until = new_sleep_until();
     let mut streams = vec![];
-    let mut remove = vec![];
     loop {
         tokio::select! {
             stream = accept_rx.recv() => {
@@ -53,24 +52,25 @@ async fn run_writer(mut accept_rx: mpsc::Receiver<TcpStream>) {
             () = tokio::time::sleep_until(sleep_until.into()) => {
                 sleep_until = new_sleep_until();
                 let spit = spitter.spit(&mut rand::rng());
-                for (i, stream) in  streams.iter_mut().enumerate() {
-                    let res = match tokio::time::timeout(Duration::from_secs(1), stream.write_all(spit.as_bytes())).await {
-                        Ok(res) => res,
-                        Err(_) => {
-                            remove.push(i);
-                            continue;
-                        }
-                    };
-                    if res.is_err() {
-                        remove.push(i);
-                    }
-                }
-                for &i in remove.iter().rev() {
-                    streams.swap_remove(i);
-                }
-                remove.clear();
+                feed_and_maintain(&mut streams, spit.as_bytes()).await;
             }
         }
+    }
+}
+
+async fn feed_and_maintain(streams: &mut Vec<TcpStream>, food: &[u8]) {
+    let mut remove = vec![];
+    for (i, stream) in streams.iter_mut().enumerate() {
+        match tokio::time::timeout(Duration::from_secs(1), stream.write_all(food)).await {
+            Ok(Err(_)) | Err(_) => {
+                remove.push(i);
+                continue;
+            }
+            Ok(_) => (),
+        }
+    }
+    for &i in remove.iter().rev() {
+        streams.swap_remove(i);
     }
 }
 
